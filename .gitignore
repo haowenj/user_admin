@@ -1,0 +1,15 @@
+node_modules/
+dist/
+build/
+*.log
+coverage.out
+server
+.helloagents/
+.env
+.env.local
+*.pyc
+__pycache__/
+*.swp
+*.swo
+.DS_Store
+opencode.json
