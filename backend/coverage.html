@@ -1,0 +1,701 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>config: Go Coverage Report</title>
+		<style>
+			body {
+				background: black;
+				color: rgb(80, 80, 80);
+			}
+			body, pre, #legend span {
+				font-family: Menlo, monospace;
+				font-weight: bold;
+			}
+			#topbar {
+				background: black;
+				position: fixed;
+				top: 0; left: 0; right: 0;
+				height: 42px;
+				border-bottom: 1px solid rgb(80, 80, 80);
+			}
+			#content {
+				margin-top: 50px;
+			}
+			#nav, #legend {
+				float: left;
+				margin-left: 10px;
+			}
+			#legend {
+				margin-top: 12px;
+			}
+			#nav {
+				margin-top: 10px;
+			}
+			#legend span {
+				margin: 0 5px;
+			}
+			.cov0 { color: rgb(192, 0, 0) }
+.cov1 { color: rgb(128, 128, 128) }
+.cov2 { color: rgb(116, 140, 131) }
+.cov3 { color: rgb(104, 152, 134) }
+.cov4 { color: rgb(92, 164, 137) }
+.cov5 { color: rgb(80, 176, 140) }
+.cov6 { color: rgb(68, 188, 143) }
+.cov7 { color: rgb(56, 200, 146) }
+.cov8 { color: rgb(44, 212, 149) }
+.cov9 { color: rgb(32, 224, 152) }
+.cov10 { color: rgb(20, 236, 155) }
+
+		</style>
+	</head>
+	<body>
+		<div id="topbar">
+			<div id="nav">
+				<select id="files">
+				
+				<option value="file0">employee-management/config/config.go (62.5%)</option>
+				
+				<option value="file1">employee-management/controllers/controller.go (0.0%)</option>
+				
+				<option value="file2">employee-management/main.go (0.0%)</option>
+				
+				<option value="file3">employee-management/models/database.go (0.0%)</option>
+				
+				<option value="file4">employee-management/models/employee.go (100.0%)</option>
+				
+				<option value="file5">employee-management/models/user.go (100.0%)</option>
+				
+				<option value="file6">employee-management/routers/router.go (0.0%)</option>
+				
+				<option value="file7">employee-management/test_server.go (0.0%)</option>
+				
+				<option value="file8">employee-management/testutil/configpath.go (73.1%)</option>
+				
+				</select>
+			</div>
+			<div id="legend">
+				<span>not tracked</span>
+			
+				<span class="cov0">not covered</span>
+				<span class="cov8">covered</span>
+			
+			</div>
+		</div>
+		<div id="content">
+		
+		<pre class="file" id="file0" style="display: none">package config
+
+import (
+        "fmt"
+        "os"
+
+        "gopkg.in/yaml.v3"
+)
+
+type Config struct {
+        Server   ServerConfig   `yaml:"server"`
+        Database DatabaseConfig `yaml:"database"`
+        JWT      JWTConfig      `yaml:"jwt"`
+}
+
+type ServerConfig struct {
+        Port int    `yaml:"port"`
+        Mode string `yaml:"mode"`
+}
+
+type DatabaseConfig struct {
+        Host     string `yaml:"host"`
+        Port     int    `yaml:"port"`
+        User     string `yaml:"user"`
+        Password string `yaml:"password"`
+        DBName   string `yaml:"dbname"`
+        Charset  string `yaml:"charset"`
+}
+
+func (dc DatabaseConfig) DSN() string <span class="cov0" title="0">{
+        return fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=%s&amp;parseTime=True&amp;loc=Local",
+                dc.User,
+                dc.Password,
+                dc.Host,
+                dc.Port,
+                dc.DBName,
+                dc.Charset,
+        )
+}</span>
+
+type JWTConfig struct {
+        Secret string `yaml:"secret"`
+        Expire string `yaml:"expire"`
+}
+
+var AppConfig *Config
+
+func InitConfig(path string) error <span class="cov8" title="1">{
+        data, err := os.ReadFile(path)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov8" title="1">AppConfig = &amp;Config{}
+        if err := yaml.Unmarshal(data, AppConfig); err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov8" title="1">return nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file1" style="display: none">package controllers
+
+import (
+        "fmt"
+        "net/http"
+        "time"
+
+        "employee-management/models"
+
+        "github.com/gin-gonic/gin"
+        "golang.org/x/crypto/bcrypt"
+        "gorm.io/gorm"
+)
+
+func Register(c *gin.Context) <span class="cov0" title="0">{
+        var input models.User
+        if err := c.ShouldBindJSON(&amp;input); err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+                return
+        }</span>
+
+        <span class="cov0" title="0">fmt.Printf("注册请求 - 用户名: %s, 密码长度: %d\n", input.Username, len(input.Password))
+
+        // 添加密码验证
+        if input.Password == "" </span><span class="cov0" title="0">{
+                fmt.Printf("错误: 密码为空\n")
+                c.JSON(http.StatusBadRequest, gin.H{"error": "密码不能为空"})
+                return
+        }</span>
+
+        <span class="cov0" title="0">if len(input.Password) &lt; 6 </span><span class="cov0" title="0">{
+                fmt.Printf("错误: 密码太短，长度: %d\n", len(input.Password))
+                c.JSON(http.StatusBadRequest, gin.H{"error": "密码长度不能少于6位"})
+                return
+        }</span>
+
+        <span class="cov0" title="0">var existingUser models.User
+        if err := models.DB.Where("username = ?", input.Username).First(&amp;existingUser).Error; err == nil </span><span class="cov0" title="0">{
+                fmt.Printf("用户已存在: %s\n", input.Username)
+                c.JSON(http.StatusBadRequest, gin.H{"error": "用户名已存在"})
+                return
+        }</span>
+
+        <span class="cov0" title="0">fmt.Printf("开始加密密码...\n")
+        fmt.Printf("原始密码: %s\n", input.Password)
+        hash, err := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
+        if err != nil </span><span class="cov0" title="0">{
+                fmt.Printf("密码加密失败: %v\n", err)
+                c.JSON(http.StatusInternalServerError, gin.H{"error": "密码加密失败"})
+                return
+        }</span>
+
+        <span class="cov0" title="0">input.Password = string(hash)
+        fmt.Printf("加密完成 - 哈希值: %s\n", input.Password)
+        fmt.Printf("哈希长度: %d\n", len(input.Password))
+
+        if err := models.DB.Create(&amp;input).Error; err != nil </span><span class="cov0" title="0">{
+                fmt.Printf("创建用户失败: %v\n", err)
+                c.JSON(http.StatusInternalServerError, gin.H{"error": "注册失败"})
+                return
+        }</span>
+
+        <span class="cov0" title="0">fmt.Printf("用户注册成功: %s\n", input.Username)
+        c.JSON(http.StatusOK, gin.H{"message": "注册成功"})</span>
+}
+
+func Login(c *gin.Context) <span class="cov0" title="0">{
+        var input struct {
+                Username string `json:"username" binding:"required"`
+                Password string `json:"password" binding:"required"`
+        }
+        if err := c.ShouldBindJSON(&amp;input); err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+                return
+        }</span>
+
+        <span class="cov0" title="0">fmt.Printf("登录请求 - 用户名: %s, 密码: %s\n", input.Username, input.Password)
+
+        var user models.User
+        if err := models.DB.Where("username = ?", input.Username).First(&amp;user).Error; err != nil </span><span class="cov0" title="0">{
+                fmt.Printf("用户查询错误: %v\n", err)
+                c.JSON(http.StatusUnauthorized, gin.H{"error": "用户名或密码错误"})
+                return
+        }</span>
+
+        <span class="cov0" title="0">fmt.Printf("找到用户 - ID: %d, 用户名: %s\n", user.ID, user.Username)
+        fmt.Printf("数据库密码: %s\n", user.Password)
+        fmt.Printf("密码长度: %d\n", len(user.Password))
+
+        // 检查密码是否为空
+        if user.Password == "" </span><span class="cov0" title="0">{
+                fmt.Printf("警告: 数据库中的密码为空！\n")
+                c.JSON(http.StatusInternalServerError, gin.H{"error": "用户数据异常"})
+                return
+        }</span>
+
+        // 检查密码格式
+        <span class="cov0" title="0">if len(user.Password) &lt; 20 </span><span class="cov0" title="0">{
+                fmt.Printf("警告: 数据库中的密码格式异常！长度: %d\n", len(user.Password))
+        }</span>
+
+        <span class="cov0" title="0">if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(input.Password)); err != nil </span><span class="cov0" title="0">{
+                fmt.Printf("密码校验失败: %v\n", err)
+                fmt.Printf("尝试手动验证...\n")
+
+                // 手动验证：用相同的密码重新哈希
+                rehash, err := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
+                if err != nil </span><span class="cov0" title="0">{
+                        fmt.Printf("重新哈希失败: %v\n", err)
+                }</span> else<span class="cov0" title="0"> {
+                        fmt.Printf("重新哈希结果: %s\n", rehash)
+                        fmt.Printf("哈希匹配: %v\n", user.Password == string(rehash))
+                }</span>
+
+                <span class="cov0" title="0">c.JSON(http.StatusUnauthorized, gin.H{"error": "用户名或密码错误"})
+                return</span>
+        }
+
+        <span class="cov0" title="0">fmt.Printf("密码校验成功！\n")
+        c.JSON(http.StatusOK, gin.H{"message": "登录成功", "user_id": user.ID})</span>
+}
+
+func ChangePassword(c *gin.Context) <span class="cov0" title="0">{
+        var input struct {
+                Username    string `json:"username" binding:"required"`
+                OldPassword string `json:"old_password" binding:"required"`
+                NewPassword string `json:"new_password" binding:"required"`
+        }
+        if err := c.ShouldBindJSON(&amp;input); err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+                return
+        }</span>
+
+        <span class="cov0" title="0">var user models.User
+        if err := models.DB.Where("username = ?", input.Username).First(&amp;user).Error; err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusNotFound, gin.H{"error": "用户不存在"})
+                return
+        }</span>
+
+        <span class="cov0" title="0">if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(input.OldPassword)); err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusUnauthorized, gin.H{"error": "原密码错误"})
+                return
+        }</span>
+
+        <span class="cov0" title="0">hash, err := bcrypt.GenerateFromPassword([]byte(input.NewPassword), bcrypt.DefaultCost)
+        if err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusInternalServerError, gin.H{"error": "密码加密失败"})
+                return
+        }</span>
+
+        <span class="cov0" title="0">if err := models.DB.Model(&amp;user).Update("password", string(hash)).Error; err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusInternalServerError, gin.H{"error": "密码修改失败"})
+                return
+        }</span>
+
+        <span class="cov0" title="0">c.JSON(http.StatusOK, gin.H{"message": "密码修改成功"})</span>
+}
+
+func GetEmployees(c *gin.Context) <span class="cov0" title="0">{
+        var employees []models.Employee
+        if err := models.DB.Find(&amp;employees).Error; err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusInternalServerError, gin.H{"error": "获取员工列表失败"})
+                return
+        }</span>
+        <span class="cov0" title="0">c.JSON(http.StatusOK, employees)</span>
+}
+
+func GetEmployee(c *gin.Context) <span class="cov0" title="0">{
+        id := c.Param("id")
+        var employee models.Employee
+        if err := models.DB.First(&amp;employee, id).Error; err != nil </span><span class="cov0" title="0">{
+                if err == gorm.ErrRecordNotFound </span><span class="cov0" title="0">{
+                        c.JSON(http.StatusNotFound, gin.H{"error": "员工不存在"})
+                }</span> else<span class="cov0" title="0"> {
+                        c.JSON(http.StatusInternalServerError, gin.H{"error": "获取员工信息失败"})
+                }</span>
+                <span class="cov0" title="0">return</span>
+        }
+        <span class="cov0" title="0">c.JSON(http.StatusOK, employee)</span>
+}
+
+func CreateEmployee(c *gin.Context) <span class="cov0" title="0">{
+        var employee models.Employee
+        if err := c.ShouldBindJSON(&amp;employee); err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+                return
+        }</span>
+
+        // 确保日期格式正确
+        <span class="cov0" title="0">if employee.HireDate == "" </span><span class="cov0" title="0">{
+                employee.HireDate = time.Now().Format("2006-01-02")
+        }</span>
+
+        <span class="cov0" title="0">fmt.Printf("创建员工 - 姓名: %s, 部门: %s, 职位: %s, 入职日期: %s\n",
+                employee.Name, employee.Department, employee.Position, employee.HireDate)
+
+        if err := models.DB.Create(&amp;employee).Error; err != nil </span><span class="cov0" title="0">{
+                fmt.Printf("创建员工失败: %v\n", err)
+                c.JSON(http.StatusInternalServerError, gin.H{"error": "创建员工失败"})
+                return
+        }</span>
+
+        <span class="cov0" title="0">c.JSON(http.StatusOK, employee)</span>
+}
+
+func UpdateEmployee(c *gin.Context) <span class="cov0" title="0">{
+        id := c.Param("id")
+        var employee models.Employee
+        if err := models.DB.First(&amp;employee, id).Error; err != nil </span><span class="cov0" title="0">{
+                if err == gorm.ErrRecordNotFound </span><span class="cov0" title="0">{
+                        c.JSON(http.StatusNotFound, gin.H{"error": "员工不存在"})
+                }</span> else<span class="cov0" title="0"> {
+                        c.JSON(http.StatusInternalServerError, gin.H{"error": "获取员工信息失败"})
+                }</span>
+                <span class="cov0" title="0">return</span>
+        }
+
+        <span class="cov0" title="0">var input models.Employee
+        if err := c.ShouldBindJSON(&amp;input); err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+                return
+        }</span>
+
+        // 确保日期格式正确
+        <span class="cov0" title="0">if input.HireDate == "" </span><span class="cov0" title="0">{
+                input.HireDate = time.Now().Format("2006-01-02")
+        }</span>
+
+        <span class="cov0" title="0">if err := models.DB.Model(&amp;employee).Updates(input).Error; err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusInternalServerError, gin.H{"error": "更新员工信息失败"})
+                return
+        }</span>
+
+        <span class="cov0" title="0">c.JSON(http.StatusOK, employee)</span>
+}
+
+func DeleteEmployee(c *gin.Context) <span class="cov0" title="0">{
+        id := c.Param("id")
+        var employee models.Employee
+        if err := models.DB.First(&amp;employee, id).Error; err != nil </span><span class="cov0" title="0">{
+                if err == gorm.ErrRecordNotFound </span><span class="cov0" title="0">{
+                        c.JSON(http.StatusNotFound, gin.H{"error": "员工不存在"})
+                }</span> else<span class="cov0" title="0"> {
+                        c.JSON(http.StatusInternalServerError, gin.H{"error": "获取员工信息失败"})
+                }</span>
+                <span class="cov0" title="0">return</span>
+        }
+
+        <span class="cov0" title="0">if err := models.DB.Delete(&amp;employee).Error; err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusInternalServerError, gin.H{"error": "删除员工失败"})
+                return
+        }</span>
+
+        <span class="cov0" title="0">c.JSON(http.StatusOK, gin.H{"message": "删除成功"})</span>
+}
+</pre>
+		
+		<pre class="file" id="file2" style="display: none">package main
+
+import (
+        "fmt"
+        "log"
+
+        "employee-management/config"
+        "employee-management/models"
+        "employee-management/routers"
+
+        "gorm.io/gorm"
+)
+
+var DB *gorm.DB
+
+func main() <span class="cov0" title="0">{
+        if err := config.InitConfig("config.yaml"); err != nil </span><span class="cov0" title="0">{
+                log.Fatalf("配置加载失败: %v", err)
+        }</span>
+
+        <span class="cov0" title="0">if err := models.InitDB(); err != nil </span><span class="cov0" title="0">{
+                log.Fatalf("数据库连接失败: %v", err)
+        }</span>
+
+        <span class="cov0" title="0">if err := models.Migrate(); err != nil </span><span class="cov0" title="0">{
+                log.Fatalf("数据库迁移失败: %v", err)
+        }</span>
+
+        <span class="cov0" title="0">r := routers.SetupRouter()
+        r.Run(fmt.Sprintf(":%d", config.AppConfig.Server.Port))</span>
+}
+</pre>
+		
+		<pre class="file" id="file3" style="display: none">package models
+
+import (
+        "employee-management/config"
+
+        "gorm.io/driver/mysql"
+        "gorm.io/gorm"
+)
+
+var DB *gorm.DB
+
+func InitDB() error <span class="cov0" title="0">{
+        dsn := config.AppConfig.Database.DSN()
+        db, err := gorm.Open(mysql.Open(dsn), &amp;gorm.Config{})
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov0" title="0">DB = db
+        return nil</span>
+}
+
+func Migrate() error <span class="cov0" title="0">{
+        return DB.AutoMigrate(&amp;User{}, &amp;Employee{})
+}</span>
+</pre>
+		
+		<pre class="file" id="file4" style="display: none">package models
+
+import (
+        "time"
+
+        "gorm.io/gorm"
+)
+
+type Employee struct {
+        ID         uint           `gorm:"primarykey" json:"id"`
+        Name       string         `gorm:"not null" json:"name"`
+        Age        int            `json:"age"`
+        Gender     string         `json:"gender"`
+        Department string         `json:"department"`
+        Position   string         `json:"position"`
+        HireDate   string         `gorm:"type:date" json:"hire_date"` // 改为字符串类型
+        CreatedAt  time.Time      `json:"created_at"`
+        UpdatedAt  time.Time      `json:"updated_at"`
+        DeletedAt  gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+func (Employee) TableName() string <span class="cov8" title="1">{
+        return "employees"
+}</span>
+</pre>
+		
+		<pre class="file" id="file5" style="display: none">package models
+
+import (
+        "time"
+
+        "gorm.io/gorm"
+)
+
+type User struct {
+        ID        uint           `gorm:"primarykey" json:"id"`
+        Username  string         `gorm:"unique;not null" json:"username"`
+        Password  string         `gorm:"not null" json:"password"` // 添加 json 标签
+        CreatedAt time.Time      `json:"created_at"`
+        UpdatedAt time.Time      `json:"updated_at"`
+        DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+func (User) TableName() string <span class="cov8" title="1">{
+        return "users"
+}</span>
+</pre>
+		
+		<pre class="file" id="file6" style="display: none">package routers
+
+import (
+        "employee-management/controllers"
+
+        "github.com/gin-gonic/gin"
+)
+
+func SetupRouter() *gin.Engine <span class="cov0" title="0">{
+        r := gin.Default()
+
+        userGroup := r.Group("/api/user")
+        </span><span class="cov0" title="0">{
+                userGroup.POST("/register", controllers.Register)
+                userGroup.POST("/login", controllers.Login)
+                userGroup.POST("/change-password", controllers.ChangePassword)
+        }</span>
+
+        <span class="cov0" title="0">employeeGroup := r.Group("/api/employee")
+        </span><span class="cov0" title="0">{
+                employeeGroup.GET("", controllers.GetEmployees)
+                employeeGroup.GET("/:id", controllers.GetEmployee)
+                employeeGroup.POST("", controllers.CreateEmployee)
+                employeeGroup.PUT("/:id", controllers.UpdateEmployee)
+                employeeGroup.DELETE("/:id", controllers.DeleteEmployee)
+        }</span>
+
+        <span class="cov0" title="0">return r</span>
+}
+</pre>
+		
+		<pre class="file" id="file7" style="display: none">package main
+
+import (
+        "fmt"
+        "log"
+        "net/http"
+        "time"
+
+        "employee-management/config"
+        "employee-management/models"
+        "employee-management/routers"
+)
+
+func startServer() <span class="cov0" title="0">{
+        // 初始化配置
+        if err := config.InitConfig("config.yaml"); err != nil </span><span class="cov0" title="0">{
+                log.Fatalf("配置加载失败: %v", err)
+        }</span>
+
+        // 初始化数据库
+        <span class="cov0" title="0">if err := models.InitDB(); err != nil </span><span class="cov0" title="0">{
+                log.Fatalf("数据库连接失败: %v", err)
+        }</span>
+
+        // 执行数据库迁移
+        <span class="cov0" title="0">if err := models.Migrate(); err != nil </span><span class="cov0" title="0">{
+                log.Fatalf("数据库迁移失败: %v", err)
+        }</span>
+
+        // 设置路由
+        <span class="cov0" title="0">router := routers.SetupRouter()
+
+        // 配置服务器
+        server := &amp;http.Server{
+                Addr:         fmt.Sprintf(":%d", config.AppConfig.Server.Port),
+                Handler:      router,
+                ReadTimeout:  15 * time.Second,
+                WriteTimeout: 15 * time.Second,
+                IdleTimeout:  60 * time.Second,
+        }
+
+        // 启动服务器
+        log.Printf("服务器启动在端口 %d", config.AppConfig.Server.Port)
+        log.Printf("访问地址: http://localhost:%d", config.AppConfig.Server.Port)
+
+        // 添加优雅关闭
+        go func() </span><span class="cov0" title="0">{
+                if err := server.ListenAndServe(); err != nil &amp;&amp; err != http.ErrServerClosed </span><span class="cov0" title="0">{
+                        log.Fatalf("服务器启动失败: %v", err)
+                }</span>
+        }()
+
+        // 等待中断信号
+        // 这里可以使用信号处理，简化版本直接阻塞
+        <span class="cov0" title="0">select </span>{}
+}
+</pre>
+		
+		<pre class="file" id="file8" style="display: none">package testutil
+
+import (
+        "database/sql"
+        "fmt"
+        "os"
+        "path/filepath"
+
+        "employee-management/config"
+
+        _ "github.com/go-sql-driver/mysql"
+)
+
+func FindConfigPath() (string, error) <span class="cov8" title="1">{
+        cwd, err := os.Getwd()
+        if err != nil </span><span class="cov0" title="0">{
+                return "", err
+        }</span>
+
+        <span class="cov8" title="1">dir := cwd
+        for i := 0; i &lt; 6; i++ </span><span class="cov8" title="1">{
+                candidate := filepath.Join(dir, "config.yaml")
+                if info, err := os.Stat(candidate); err == nil &amp;&amp; !info.IsDir() </span><span class="cov8" title="1">{
+                        return candidate, nil
+                }</span>
+
+                <span class="cov8" title="1">parent := filepath.Dir(dir)
+                if parent == dir </span><span class="cov0" title="0">{
+                        break</span>
+                }
+                <span class="cov8" title="1">dir = parent</span>
+        }
+
+        <span class="cov0" title="0">return "", fmt.Errorf("config.yaml not found from %s", cwd)</span>
+}
+
+func LoadConfigForTest() error <span class="cov8" title="1">{
+        path, err := FindConfigPath()
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+        <span class="cov8" title="1">return config.InitConfig(path)</span>
+}
+
+func EnsureDatabaseExists(cfg config.DatabaseConfig) error <span class="cov8" title="1">{
+        dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/?charset=%s&amp;parseTime=True&amp;loc=Local",
+                cfg.User,
+                cfg.Password,
+                cfg.Host,
+                cfg.Port,
+                cfg.Charset,
+        )
+
+        db, err := sql.Open("mysql", dsn)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+        <span class="cov8" title="1">defer db.Close()
+
+        if err := db.Ping(); err != nil </span><span class="cov8" title="1">{
+                return err
+        }</span>
+
+        <span class="cov0" title="0">_, err = db.Exec(fmt.Sprintf("CREATE DATABASE IF NOT EXISTS `%s`", cfg.DBName))
+        return err</span>
+}
+</pre>
+		
+		</div>
+	</body>
+	<script>
+	(function() {
+		var files = document.getElementById('files');
+		var visible;
+		files.addEventListener('change', onChange, false);
+		function select(part) {
+			if (visible)
+				visible.style.display = 'none';
+			visible = document.getElementById(part);
+			if (!visible)
+				return;
+			files.value = part;
+			visible.style.display = 'block';
+			location.hash = part;
+		}
+		function onChange() {
+			select(files.value);
+			window.scrollTo(0, 0);
+		}
+		if (location.hash != "") {
+			select(location.hash.substr(1));
+		}
+		if (!visible) {
+			select("file0");
+		}
+	})();
+	</script>
+</html>

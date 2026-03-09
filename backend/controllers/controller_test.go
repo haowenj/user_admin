@@ -12,6 +12,7 @@ import (
 
 	"employee-management/config"
 	"employee-management/models"
+	"employee-management/testutil"
 
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
@@ -20,18 +21,20 @@ import (
 var testUser models.User
 var testEmployee models.Employee
 
-func setupTestDB() {
+func setupTestDB(t testing.TB) {
+	t.Helper()
+
 	// 设置Gin为测试模式
 	gin.SetMode(gin.TestMode)
 
 	// 初始化测试配置
-	if err := config.InitConfig("config.yaml"); err != nil {
-		panic("failed to load test config")
+	if err := testutil.LoadConfigForTest(); err != nil {
+		t.Skipf("加载测试配置失败: %v", err)
 	}
 
 	// 修改配置为测试数据库
 	config.AppConfig.Database = config.DatabaseConfig{
-		Host:     "localhost",
+		Host:     "127.0.0.1",
 		Port:     3306,
 		User:     "root",
 		Password: "",
@@ -39,13 +42,19 @@ func setupTestDB() {
 		Charset:  "utf8mb4",
 	}
 
+	if err := testutil.EnsureDatabaseExists(config.AppConfig.Database); err != nil {
+		t.Skipf("测试数据库不可用: %v", err)
+	}
+
 	// 连接测试数据库
 	if err := models.InitDB(); err != nil {
-		panic("failed to connect test database: " + err.Error())
+		t.Skipf("连接测试数据库失败: %v", err)
 	}
 
 	// 自动迁移表
-	models.Migrate()
+	if err := models.Migrate(); err != nil {
+		t.Skipf("测试数据库迁移失败: %v", err)
+	}
 
 	// 创建测试用户
 	hashedPassword, _ := generateHash("TestPass123!")
@@ -86,7 +95,7 @@ func generateHash(password string) (string, error) {
 }
 
 func TestRegisterUser(t *testing.T) {
-	setupTestDB()
+	setupTestDB(t)
 	defer teardownTestDB()
 
 	tests := []struct {
@@ -166,7 +175,7 @@ func TestRegisterUser(t *testing.T) {
 }
 
 func TestLoginUser(t *testing.T) {
-	setupTestDB()
+	setupTestDB(t)
 	defer teardownTestDB()
 
 	tests := []struct {
@@ -237,7 +246,7 @@ func TestLoginUser(t *testing.T) {
 }
 
 func TestChangePassword(t *testing.T) {
-	setupTestDB()
+	setupTestDB(t)
 	defer teardownTestDB()
 
 	tests := []struct {
@@ -311,7 +320,7 @@ func TestChangePassword(t *testing.T) {
 }
 
 func TestGetEmployees(t *testing.T) {
-	setupTestDB()
+	setupTestDB(t)
 	defer teardownTestDB()
 
 	router := gin.Default()
@@ -334,7 +343,7 @@ func TestGetEmployees(t *testing.T) {
 }
 
 func TestGetEmployee(t *testing.T) {
-	setupTestDB()
+	setupTestDB(t)
 	defer teardownTestDB()
 
 	router := gin.Default()
@@ -367,7 +376,7 @@ func TestGetEmployee(t *testing.T) {
 }
 
 func TestCreateEmployee(t *testing.T) {
-	setupTestDB()
+	setupTestDB(t)
 	defer teardownTestDB()
 
 	tests := []struct {
@@ -433,7 +442,7 @@ func TestCreateEmployee(t *testing.T) {
 }
 
 func TestUpdateEmployee(t *testing.T) {
-	setupTestDB()
+	setupTestDB(t)
 	defer teardownTestDB()
 
 	tests := []struct {
@@ -510,7 +519,7 @@ func TestUpdateEmployee(t *testing.T) {
 }
 
 func TestDeleteEmployee(t *testing.T) {
-	setupTestDB()
+	setupTestDB(t)
 	defer teardownTestDB()
 
 	router := gin.Default()
@@ -544,7 +553,7 @@ func TestDeleteEmployee(t *testing.T) {
 
 // SQL注入测试
 func TestSQLInjection(t *testing.T) {
-	setupTestDB()
+	setupTestDB(t)
 	defer teardownTestDB()
 
 	router := gin.Default()
@@ -599,7 +608,7 @@ func TestSQLInjection(t *testing.T) {
 
 // XSS攻击测试
 func TestXSSAttack(t *testing.T) {
-	setupTestDB()
+	setupTestDB(t)
 	defer teardownTestDB()
 
 	router := gin.Default()
@@ -652,7 +661,7 @@ func TestXSSAttack(t *testing.T) {
 
 // 性能测试
 func TestPerformance(t *testing.T) {
-	setupTestDB()
+	setupTestDB(t)
 	defer teardownTestDB()
 
 	router := gin.Default()

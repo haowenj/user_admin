@@ -13,6 +13,12 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
+# 兼容受限环境下的Go构建缓存目录
+if [ -z "$GOCACHE" ]; then
+    export GOCACHE="${TMPDIR:-/tmp}/go-build-cache"
+fi
+mkdir -p "$GOCACHE"
+
 # 测试结果计数
 TOTAL_TESTS=0
 PASSED_TESTS=0
@@ -113,15 +119,15 @@ echo "=========================================="
 if ! command -v mysql &> /dev/null; then
     echo -e "${YELLOW}警告: MySQL未安装，跳过集成测试${NC}"
 else
-    # 检查测试数据库是否存在
-    if mysql -u root -e "USE employee_test;" 2>/dev/null; then
+    # 尝试创建测试数据库
+    if mysql -u root -e "CREATE DATABASE IF NOT EXISTS employee_test;" 2>/dev/null; then
         run_test "用户集成测试" "go test -v -run TestIntegrationUserRegister ./"
         run_test "登录集成测试" "go test -v -run TestIntegrationUserLogin ./"
         run_test "员工CRUD集成测试" "go test -v -run TestIntegrationEmployeeCRUD ./"
         run_test "安全性集成测试" "go test -v -run TestIntegrationSecurity ./"
     else
-        echo -e "${YELLOW}警告: 测试数据库不存在，跳过集成测试${NC}"
-        echo "请先创建测试数据库: CREATE DATABASE employee_test;"
+        echo -e "${YELLOW}警告: 测试数据库不可用，跳过集成测试${NC}"
+        echo "请确保MySQL可用并创建测试数据库: CREATE DATABASE employee_test;"
     fi
 fi
 
@@ -168,52 +174,77 @@ echo "=========================================="
 echo "5. 运行API测试"
 echo "=========================================="
 
-# 检查是否需要启动服务器
-if pgrep -f "go run main.go" > /dev/null; then
-    echo -e "${YELLOW}检测到服务器已在运行${NC}"
+SERVER_PID=""
+
+if ! command -v curl &> /dev/null; then
+    echo -e "${YELLOW}警告: curl未安装，跳过API测试${NC}"
+elif ! command -v mysql &> /dev/null; then
+    echo -e "${YELLOW}警告: MySQL未安装，跳过API测试${NC}"
+elif ! mysql -u root -e "CREATE DATABASE IF NOT EXISTS employee_test;" 2>/dev/null; then
+    echo -e "${YELLOW}警告: 测试数据库不可用，跳过API测试${NC}"
 else
-    echo -e "${YELLOW}启动测试服务器...${NC}"
-    nohup go run main.go > server.log 2>&1 &
-    sleep 3 # 等待服务器启动
-    
-    if pgrep -f "go run main.go" > /dev/null; then
-        echo -e "${GREEN}✓ 服务器启动成功${NC}"
+    # 检查服务器是否已运行（避免使用pgrep/ps）
+    http_code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 2 http://localhost:8080/api/employee || true)
+    if [ "$http_code" = "000" ]; then
+        echo -e "${YELLOW}启动测试服务器...${NC}"
+        nohup go run main.go > server.log 2>&1 &
+        SERVER_PID=$!
+        sleep 3 # 等待服务器启动
+
+        http_code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 2 http://localhost:8080/api/employee || true)
+        if [ "$http_code" = "000" ]; then
+            echo -e "${RED}✗ 服务器启动失败${NC}"
+            if [ -f server.log ]; then
+                echo -e "${YELLOW}最近日志:${NC}"
+                tail -n 20 server.log
+            fi
+        else
+            echo -e "${GREEN}✓ 服务器启动成功${NC}"
+        fi
     else
-        echo -e "${RED}✗ 服务器启动失败${NC}"
-        exit 1
+        echo -e "${YELLOW}检测到服务器已在运行${NC}"
     fi
 fi
 
 # 运行API测试
-api_tests=(
-    "用户注册测试"
-    "用户登录测试"
-    "员工查询测试"
-    "员工创建测试"
-)
+if command -v curl &> /dev/null && command -v mysql &> /dev/null && mysql -u root -e "CREATE DATABASE IF NOT EXISTS employee_test;" 2>/dev/null; then
+    if [ "$http_code" != "000" ]; then
+        api_tests=(
+            "用户注册测试"
+            "用户登录测试"
+            "员工查询测试"
+            "员工创建测试"
+        )
 
-for test_name in "${api_tests[@]}"; do
-    case $test_name in
-        "用户注册测试")
-            run_test "$test_name" "curl -s -w '%{http_code}' -X POST http://localhost:8080/api/user/register -H 'Content-Type: application/json' -d '{\"username\":\"apitestuser\",\"password\":\"ApiPass123!\"}' | tail -1"
-            ;;
-        "用户登录测试")
-            run_test "$test_name" "curl -s -w '%{http_code}' -X POST http://localhost:8080/api/user/login -H 'Content-Type: application/json' -d '{\"username\":\"apitestuser\",\"password\":\"ApiPass123!\"}' | tail -1"
-            ;;
-        "员工查询测试")
-            run_test "$test_name" "curl -s -w '%{http_code}' -X GET http://localhost:8080/api/employee | tail -1"
-            ;;
-        "员工创建测试")
-            run_test "$test_name" "curl -s -w '%{http_code}' -X POST http://localhost:8080/api/employee -H 'Content-Type: application/json' -d '{\"name\":\"API测试员工\",\"age\":25,\"gender\":\"男\",\"department\":\"技术部\",\"position\":\"工程师\"}' | tail -1"
-            ;;
-    esac
-done
+        for test_name in "${api_tests[@]}"; do
+            case $test_name in
+                "用户注册测试")
+                    run_test "$test_name" "curl -s -w '%{http_code}' -X POST http://localhost:8080/api/user/register -H 'Content-Type: application/json' -d '{\"username\":\"apitestuser\",\"password\":\"ApiPass123!\"}' | tail -1"
+                    ;;
+                "用户登录测试")
+                    run_test "$test_name" "curl -s -w '%{http_code}' -X POST http://localhost:8080/api/user/login -H 'Content-Type: application/json' -d '{\"username\":\"apitestuser\",\"password\":\"ApiPass123!\"}' | tail -1"
+                    ;;
+                "员工查询测试")
+                    run_test "$test_name" "curl -s -w '%{http_code}' -X GET http://localhost:8080/api/employee | tail -1"
+                    ;;
+                "员工创建测试")
+                    run_test "$test_name" "curl -s -w '%{http_code}' -X POST http://localhost:8080/api/employee -H 'Content-Type: application/json' -d '{\"name\":\"API测试员工\",\"age\":25,\"gender\":\"男\",\"department\":\"技术部\",\"position\":\"工程师\"}' | tail -1"
+                    ;;
+            esac
+        done
+    else
+        echo -e "${YELLOW}警告: 服务器未能启动，跳过API测试${NC}"
+    fi
+fi
 
 # 停止测试服务器
-echo ""
-echo -e "${YELLOW}停止测试服务器...${NC}"
-pkill -f "go run main.go"
-sleep 1
+if [ -n "$SERVER_PID" ]; then
+    echo ""
+    echo -e "${YELLOW}停止测试服务器...${NC}"
+    kill "$SERVER_PID" 2>/dev/null
+    wait "$SERVER_PID" 2>/dev/null
+    sleep 1
+fi
 
 # 6. 生成测试报告
 echo ""

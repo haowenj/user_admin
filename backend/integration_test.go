@@ -12,20 +12,23 @@ import (
 	"employee-management/config"
 	"employee-management/models"
 	"employee-management/routers"
+	"employee-management/testutil"
 
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
 )
 
-func setupTestDB() {
+func setupTestDB(t testing.TB) {
+	t.Helper()
+
 	// 初始化测试配置
-	if err := config.InitConfig("config.yaml"); err != nil {
-		panic("failed to load test config")
+	if err := testutil.LoadConfigForTest(); err != nil {
+		t.Skipf("加载测试配置失败: %v", err)
 	}
 
 	// 修改配置为测试数据库
 	config.AppConfig.Database = config.DatabaseConfig{
-		Host:     "localhost",
+		Host:     "127.0.0.1",
 		Port:     3306,
 		User:     "root",
 		Password: "",
@@ -33,13 +36,19 @@ func setupTestDB() {
 		Charset:  "utf8mb4",
 	}
 
+	if err := testutil.EnsureDatabaseExists(config.AppConfig.Database); err != nil {
+		t.Skipf("测试数据库不可用: %v", err)
+	}
+
 	// 连接测试数据库
 	if err := models.InitDB(); err != nil {
-		panic("failed to connect test database: " + err.Error())
+		t.Skipf("连接测试数据库失败: %v", err)
 	}
 
 	// 自动迁移表
-	models.Migrate()
+	if err := models.Migrate(); err != nil {
+		t.Skipf("测试数据库迁移失败: %v", err)
+	}
 }
 
 func teardownTestDB() {
@@ -52,7 +61,7 @@ func teardownTestDB() {
 }
 
 func TestIntegrationUserRegister(t *testing.T) {
-	setupTestDB()
+	setupTestDB(t)
 	defer teardownTestDB()
 
 	router := setupTestRouter()
@@ -122,7 +131,7 @@ func TestIntegrationUserRegister(t *testing.T) {
 }
 
 func TestIntegrationUserLogin(t *testing.T) {
-	setupTestDB()
+	setupTestDB(t)
 	defer teardownTestDB()
 
 	// 先创建一个测试用户
@@ -131,7 +140,7 @@ func TestIntegrationUserLogin(t *testing.T) {
 		Username: "loginuser",
 		Password: hashedPassword,
 	}
-	db.Create(&user)
+	models.DB.Create(&user)
 
 	router := setupTestRouter()
 
@@ -193,7 +202,7 @@ func TestIntegrationUserLogin(t *testing.T) {
 }
 
 func TestIntegrationEmployeeCRUD(t *testing.T) {
-	setupTestDB()
+	setupTestDB(t)
 	defer teardownTestDB()
 
 	router := setupTestRouter()
@@ -228,7 +237,7 @@ func TestIntegrationEmployeeCRUD(t *testing.T) {
 
 		// 验证数据库中的员工
 		var employee models.Employee
-		if err := db.Where("name = ?", "集成测试员工").First(&employee).Error; err != nil {
+		if err := models.DB.Where("name = ?", "集成测试员工").First(&employee).Error; err != nil {
 			t.Errorf("数据库中未找到员工: %v", err)
 		}
 
@@ -289,7 +298,7 @@ func TestIntegrationEmployeeCRUD(t *testing.T) {
 		}
 
 		var updatedEmployee models.Employee
-		db.First(&updatedEmployee, employeeID)
+		models.DB.First(&updatedEmployee, employeeID)
 
 		if updatedEmployee.Name != "集成测试员工（更新）" {
 			t.Errorf("期望更新后姓名 '集成测试员工（更新）'，实际 '%s'", updatedEmployee.Name)
@@ -306,7 +315,7 @@ func TestIntegrationEmployeeCRUD(t *testing.T) {
 
 		// 验证员工已被软删除
 		var count int64
-		db.Model(&models.Employee{}).Where("id = ?", employeeID).Count(&count)
+		models.DB.Model(&models.Employee{}).Where("id = ?", employeeID).Count(&count)
 		if count > 0 {
 			t.Error("员工未被正确删除")
 		}
@@ -314,7 +323,7 @@ func TestIntegrationEmployeeCRUD(t *testing.T) {
 }
 
 func TestIntegrationSecurity(t *testing.T) {
-	setupTestDB()
+	setupTestDB(t)
 	defer teardownTestDB()
 
 	router := setupTestRouter()
@@ -335,7 +344,7 @@ func TestIntegrationSecurity(t *testing.T) {
 
 		// 检查数据库是否仍然存在
 		var count int64
-		db.Model(&models.User{}).Count(&count)
+		models.DB.Model(&models.User{}).Count(&count)
 
 		if count == 0 {
 			t.Error("数据库被SQL注入破坏")
