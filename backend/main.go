@@ -15,7 +15,8 @@ var DB *gorm.DB
 
 func main() {
 	if err := config.InitConfig("config.yaml"); err != nil {
-		log.Fatalf("配置加载失败: %v", err)
+		log.Printf("配置加载失败: %v", err)
+		return
 	}
 
 	if err := models.InitDB(); err != nil {
