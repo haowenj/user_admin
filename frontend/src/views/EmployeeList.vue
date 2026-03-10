@@ -1,6 +1,6 @@
 <template>
   <div class="employee-container">
-    <el-card>
+  <el-card class="employee-card" ref="cardRef">
       <template #header>
         <div class="header">
           <h3>员工信息管理</h3>
@@ -8,14 +8,14 @@
         </div>
       </template>
       
-      <el-table :data="employees" border stripe>
+      <el-table class="employee-table" :data="employees" border stripe :height="tableHeight" table-layout="auto">
         <el-table-column prop="id" label="ID" width="60" />
-        <el-table-column prop="name" label="姓名" width="100" />
+        <el-table-column prop="name" label="姓名" min-width="140" />
         <el-table-column prop="age" label="年龄" width="80" />
         <el-table-column prop="gender" label="性别" width="80" />
-        <el-table-column prop="department" label="部门" width="120" />
-        <el-table-column prop="position" label="职位" width="120" />
-        <el-table-column prop="hire_date" label="入职日期" width="120" />
+        <el-table-column prop="department" label="部门" min-width="160" />
+        <el-table-column prop="position" label="职位" min-width="160" />
+        <el-table-column prop="hire_date" label="入职日期" min-width="140" />
         <el-table-column label="操作" fixed="right" width="180">
           <template #default="{ row }">
             <el-button size="small" @click="handleEdit(row)">编辑</el-button>
@@ -58,7 +58,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { employeeAPI } from '../api'
 
@@ -67,6 +67,10 @@ const dialogVisible = ref(false)
 const isEdit = ref(false)
 const currentId = ref(null)
 const formRef = ref()
+const cardRef = ref()
+const tableHeight = ref(null)
+let cardBodyEl = null
+let resizeRaf = 0
 
 const form = ref({
   name: '',
@@ -87,6 +91,8 @@ const loadEmployees = async () => {
   try {
     const res = await employeeAPI.getList()
     employees.value = res.data
+    await nextTick()
+    updateTableHeight()
   } catch (err) {
     ElMessage.error('获取员工列表失败')
   }
@@ -135,20 +141,73 @@ const handleSubmit = async () => {
   }
 }
 
-onMounted(() => {
+const updateTableHeight = () => {
+  if (!cardBodyEl) return
+  const height = cardBodyEl.clientHeight
+  if (height > 0) {
+    tableHeight.value = height
+  }
+}
+
+const handleResize = () => {
+  if (resizeRaf) {
+    cancelAnimationFrame(resizeRaf)
+  }
+  resizeRaf = requestAnimationFrame(() => {
+    updateTableHeight()
+  })
+}
+
+onMounted(async () => {
+  await nextTick()
+  const cardEl = cardRef.value?.$el
+  cardBodyEl = cardEl ? cardEl.querySelector('.el-card__body') : null
+  updateTableHeight()
+  window.addEventListener('resize', handleResize)
   loadEmployees()
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', handleResize)
+  if (resizeRaf) {
+    cancelAnimationFrame(resizeRaf)
+  }
 })
 </script>
 
 <style scoped>
 .employee-container {
   padding: 20px;
+  height: 100%;
+  box-sizing: border-box;
+  min-height: 0;
+}
+
+.employee-card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.employee-card :deep(.el-card__body) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.employee-table {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
 }
 
 h3 {
