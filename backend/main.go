@@ -20,7 +20,8 @@ func main() {
 	}
 
 	if err := models.InitDB(); err != nil {
-		log.Fatalf("数据库连接失败: %v", err)
+		log.Printf("数据库连接失败: %v", err)
+		return
 	}
 
 	if err := models.Migrate(); err != nil {
